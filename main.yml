@@ -1,0 +1,11 @@
+- hosts: localhost
+  gather_facts: no
+  vars_files: secrets.yaml
+  tasks:
+    - name: Import the webserver role
+      import_role:
+        name: webserver
+      become: true
+    - name: Import the agnosticiso role
+      import_role:
+        name: agnosticiso

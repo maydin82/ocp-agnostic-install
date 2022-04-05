@@ -1,0 +1,29 @@
+---
+all:
+  children:
+    bootstrap:
+      hosts:
+        bootstrap.example.com:
+          ipv4: 192.168.1.1
+    
+    master:
+      hosts:
+        master1.example.com:
+          ipv4: 192.168.1.2
+
+        master2.example.com:
+          ipv4: 192.168.1.3
+
+        master3.example.com:
+          ipv4: 192.168.1.4
+        
+    worker:
+      hosts:
+        worker1.example.com:
+          ipv4: 192.168.1.10
+
+        worker2.example.com:
+          #dhcp
+
+        worker3.example.com:
+...

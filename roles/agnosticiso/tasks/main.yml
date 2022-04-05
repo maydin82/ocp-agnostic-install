@@ -1,0 +1,66 @@
+---
+# tasks file for agnosticiso
+- name: Create a backup of existing OCP install folder
+  archive: 
+   path: "~/install-dir/install"
+   dest: "~/install-dir/install-{{ '%s' | strftime }}.tgz"
+   remove: true
+  ignore_errors: yes
+
+- name: Create directory for OCP install
+  file: 
+   path: "~/install-dir"
+   state: directory
+   mode: '0755'
+
+- name: Create install config in OCP install folder
+  template:
+   src: "install-config.yaml.j2"
+   dest: "~/install-dir/install/install-config.yaml"
+
+- name: Copy install-config.yaml to tmp to check later
+  copy:
+    src: "~/install-dir/install/install-config.yaml"
+    dest: /tmp/install-config.yaml
+    remote_src: yes
+
+- name: Check that the oc client  exists
+  stat:
+    path: /usr/local/bin/oc
+  register: oc_stat_result
+
+- name: Check that the installer  exists
+  stat:
+    path: ~/install-dir/openshift-install
+  register: installer_stat_result
+
+- name: Extract the installer
+  unarchive:
+    src: https://mirror.openshift.com/pub/openshift-v4/clients/ocp/{{ rhcos_version }}.{{ ocp_subversion }}/openshift-install-linux.tar.gz
+    dest: ~/install-dir/
+    remote_src: yes
+  when: not installer_stat_result.stat.exists
+
+- name: Extract the oc client  
+  unarchive:
+    src: https://mirror.openshift.com/pub/openshift-v4/clients/ocp/{{ rhcos_version }}.{{ ocp_subversion }}/openshift-client-linux.tar.gz
+    dest: /usr/local/bin
+    remote_src: yes
+  when: not oc_stat_result.stat.exists
+
+
+- name: Create ignition files
+  command: |
+    ~/install-dir/openshift-install create ignition-configs --dir "~/install-dir/install"
+
+
+- name: Copy ignition files to web server folder
+  become: true
+  copy: 
+   src: "~/install-dir/install/{{ item }}.ign"
+   dest: "{{ webserver_root }}/{{ item }}.ign"
+   mode: 0644
+  loop:
+    - "master"
+    - "worker"
+    - "bootstrap" 

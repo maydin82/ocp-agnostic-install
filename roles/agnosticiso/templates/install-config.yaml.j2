@@ -1,0 +1,35 @@
+apiVersion: v1
+baseDomain: {{ baseDomain }}
+compute:
+- hyperthreading: Enabled
+  name: worker
+  replicas: 0
+controlPlane:
+  hyperthreading: Enabled
+  name: master
+  replicas: 3
+metadata:
+  name: {{ clustername }}
+networking:
+  machineCIDR: {{ machineCIDR }}
+  clusterNetwork:
+  - cidr: 192.168.0.0/16
+    hostPrefix: 23
+  networkType: {{ networkType }}
+  serviceNetwork:
+  - 172.30.0.0/16
+{% if proxy is sameas true %}
+proxy:
+  httpProxy: {{ http_proxy }}
+  httpsProxy: {{ https_proxy }}
+{% endif %}
+{% if additionalTrustBundle is defined %}
+additionalTrustBundle: |
+{{ additionalTrustBundle|indent( width=4, first=True)}}
+{% endif %}
+platform:
+  none: {}
+fips: false
+pullSecret: '{{ pullSecret }}'
+sshKey: '{{ sshKey }}'
+

@@ -1,0 +1,85 @@
+---
+# tasks file for webserver
+
+- name: install required packages for webserver
+  yum:
+    name:
+      - podman
+      - firewalld
+      - wget
+    state: present
+
+- name: Make sure firewalld is running
+  systemd:
+    state: started
+    name: firewalld
+    enabled: yes
+
+- name: permit traffic in default zone on port {{ http_port }}
+  firewalld:
+    port: "{{ http_port }}/tcp"
+    permanent: yes
+    state: enabled
+
+- name: Create directory for Web server
+  file: 
+   path: "{{ webserver_root }}"
+   state: directory
+   mode: '0755'
+
+
+- name: Fetch RHCOS files
+  get_url:
+    dest: "{{ webserver_root }}"
+    url: "{{ item }}"
+  with_items:
+    - "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/{{ rhcos_version }}/{{ rhcos_version }}.{{ rhcos_subversion }}/rhcos-{{ rhcos_version }}.{{ rhcos_subversion }}-x86_64-metal.x86_64.raw.gz"
+    - "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/{{ rhcos_version }}/{{ rhcos_version }}.{{ rhcos_subversion }}/rhcos-{{ rhcos_version }}.{{ rhcos_subversion }}-x86_64-live-kernel-x86_64"
+    - "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/{{ rhcos_version }}/{{ rhcos_version }}.{{ rhcos_subversion }}/rhcos-{{ rhcos_version }}.{{ rhcos_subversion }}-x86_64-live-initramfs.x86_64.img"
+    - "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/{{ rhcos_version }}/{{ rhcos_version }}.{{ rhcos_subversion }}/rhcos-{{ rhcos_version }}.{{ rhcos_subversion }}-x86_64-live-rootfs.x86_64.img"
+  when: installation_method == "pxe"
+
+- name: Check that the iso image  already exists
+  stat:
+    path: /tmp/rhcos-{{ rhcos_version }}.{{ rhcos_subversion }}-x86_64-live.x86_64.iso
+  register: iso_stat_result
+
+- name: Fetch RHCOS files
+  get_url:
+    dest: /tmp
+    url: "{{ item }}"
+  with_items:
+    - "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/{{ rhcos_version }}/{{ rhcos_version }}.{{ rhcos_subversion }}/rhcos-{{ rhcos_version }}.{{ rhcos_subversion }}-x86_64-live.x86_64.iso"
+  when: installation_method == "iso" and  not iso_stat_result.stat.exists
+
+
+- name: Allow httpd to modify files in {{ webserver_root  }}
+  sefcontext:
+    target: '{{ webserver_root }}(/.*)?'
+    setype: httpd_sys_content_t
+    state: present
+
+- name: Apply new SELinux file context to filesystem
+  command: restorecon -Rv {{ webserver_root }}/
+
+- name: Create a data container
+  containers.podman.podman_container:
+    name: webserver
+    image: "{{ httpd_image }}"
+    ports:
+      - "{{ http_port }}:{{ http_port }}"
+    volume:
+      - "{{ webserver_root }}:/var/www/html"
+    generate_systemd:
+      path: /etc/systemd/system/
+      restart_policy: always
+      time: 120
+      names: true
+
+
+- name: Make sure container-webserver service is running
+  systemd:
+    state: started
+    name: container-webserver
+    enabled: yes
+
